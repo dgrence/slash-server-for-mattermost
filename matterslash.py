@@ -19,10 +19,6 @@ import socketserver
 import random
 
 
-# Define server address and port, use localhost if you are running this on your Mattermost server.
-HOSTNAME = 'localhost'
-PORT = 8088
-
 # guarantee unicode string
 _u = lambda t: t.decode('UTF-8', 'replace') if isinstance(t, str) else t
 
