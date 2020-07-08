@@ -11,11 +11,13 @@ Feel free to fork and expand this project.
 I struggled a lot with de- and encoding of strings. I suppose, that could be done much easier.
 """
 
-from BaseHTTPServer import BaseHTTPRequestHandler
-import urlparse
+from http.server import BaseHTTPRequestHandler
+import urllib.parse as urlparse
 import json
-# This is used for /weather command
-import pyowm
+import http.server
+import socketserver
+import random
+
 
 # Define server address and port, use localhost if you are running this on your Mattermost server.
 HOSTNAME = 'localhost'
@@ -50,7 +52,7 @@ class PostHandler(BaseHTTPRequestHandler):
         post_data = urlparse.parse_qs(self.rfile.read(length).decode('utf-8'))
 
         # Get POST data and initialize MattermostRequest object
-        for key, value in post_data.iteritems():
+        for key, value in post_data.items():
             if key == 'response_url':
                 MattermostRequest.response_url = value
             elif key == 'text':
@@ -78,65 +80,29 @@ class PostHandler(BaseHTTPRequestHandler):
         # elif MattermostRequest.token == '<another token from Mattermost slash integration>':
         #    responsetext = do_some_other_thing(MattermostRequest.text, MattermostRequest.user_name)
         # Here we trigger the command
-        if MattermostRequest.command[0] == u'/weather':
-            responsetext = getweather(MattermostRequest.text)
-        elif MattermostRequest.command[0] == u'/othercommand':
-            responsetext = dosomething(MattermostRequest.text, MattermostRequest.user_name)
-        elif MattermostRequest.command[0] == u'/yetanothercommand':
-            responsetext = dosomethingelse(MattermostRequest.text, MattermostRequest.user_name)
+
+        if MattermostRequest.command[0] == u'/magic':
+            responsetext = do_echo(MattermostRequest.text)
 
         if responsetext:
             data = {}
-            # 'response_type' may also be 'in_channel'
-            data['response_type'] = 'ephemeral'
+            # 'response_type' may also be 'in_channel' 'ephemeral'
+            data['response_type'] = 'in_channel'
             data['text'] = responsetext
             self.send_response(200)
             self.send_header("Content-type", "application/json")
             self.end_headers()
-            self.wfile.write(json.dumps(data))
+            self.wfile.write(json.dumps(data).encode())
         return
 
-
-def getweather(city):
-    searchstring = ''.join(city).encode('latin1')
-    searchstring = searchstring
-    if searchstring == '':
-        searchstring = 'Kiel,de'
-
-    # Get your own API key from http://openweathermap.org/api
-    # You can also change the language setting here:
-    owm = pyowm.OWM(API_key='<insert your api key>', language='en')
-    observation = owm.weather_at_place(searchstring)
-    w = observation.get_weather()
-
-    city = _u(''.join(city))
-    # Build the response as table...
-    response = u'#### You requested the weather in ' + city + ':\n\n'
-    response += u'| Parameter | Value |\n' + \
-               u'| :---- | :---- |\n'
-    response += u'| Temperature : | ' + str(w.get_temperature('celsius')['temp']) + u"° C |\n"
-    response += u'| Status : | ' + w.get_detailed_status() + u" |\n"
-    response += u'| Clouds: | ' + str(w.get_clouds()) + u"% |\n"
-    response += u'| Wind speed: | ' + str(w.get_wind()['speed']) + u" |\n"
-    response += u'| Wind direction: | ' + str(w.get_wind()['deg']) + u"° |\n"
-    response += u'| Air pressure: | ' + str(w.get_pressure()['press']) + u" hPa|\n"
-    return response
-
-
-def dosomething(text, username):
-    username = ''.join(username).encode('latin1')
-    text = ''.join(text).encode('latin1')
-    return u'#### Hello ' + username + '!\n This is what you wrote: `' + text + "`."
-
-
-def dosomethingelse(text, username):
-    username = ''.join(username).encode('latin1')
-    text = ''.join(text).encode('latin1')
-    return u'#### Moin ' + username + ' as we say in northern Germany. What did you mean with `' + text + "`?"
-
+def do_echo(text, username):
+    text = ''.join(text)
+    return text
 
 if __name__ == '__main__':
-    from BaseHTTPServer import HTTPServer
-    server = HTTPServer((HOSTNAME, PORT), PostHandler)
-    print('Starting matterslash server, use <Ctrl-C> to stop')
-    server.serve_forever()
+
+    PORT = 8000
+
+    with socketserver.TCPServer(("", PORT), PostHandler) as httpd:
+        print("serving at port", PORT)
+        httpd.serve_forever()
